@@ -18,6 +18,7 @@ const int PIN_SERVO = 4;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 Servo puertaServo;
 
+
 // Variables Globales a Utilizar
 String comando = "";
 int velocidadFan = 0;
@@ -50,6 +51,7 @@ String escenasGuardadas[10];
 // Nombres de escenas
 int numEscenas = 0;
 
+
 void setup() {
   // Inicializar el puerto serial
   Serial.begin(9600);
@@ -65,7 +67,6 @@ void setup() {
   puertaServo.attach(PIN_SERVO);
   lcd.init();
   lcd.backlight();
-
 // Recuperacion del estado de la EEPROM
   recuperarEstado();
   actualizarLCD();
@@ -76,10 +77,104 @@ void setup() {
 
 void loop() {
 
+  // Para manejar el ingreso comandos
+  if (Serial.available() > 0){
+    comando = Serial.readStringUntil('\n');
+    comando.trim();
+    comando.toUpperCase();
+    interpretarComando(comando);
+  }
+ 
+  // Para manejar escenas activas , ejecutarlas.
+  if (escenaActiva){
+    //ejecutarEscenaNonBlocking();
+  }
+
 }
 
 void ejecutarEscenaNonBlocking(){
 
+}
+
+void interpretarComando(String cmd){
+  // Flujo de control del comando
+  
+  // Control de comandos de luces
+  if (cmd == "L1" || cmd == "L1ON") { digitalWrite(PIN_SALA,HIGH);
+  Serial.println("SALA:ON"); }
+  else if (cmd == "L1OFF") { digitalWrite(PIN_SALA,LOW); Serial.println("SALA:OFF");
+  }
+  else if (cmd == "L2" || cmd == "L2ON") { digitalWrite(PIN_COMEDOR,HIGH); Serial.println("COMEDOR:ON");
+  }
+  else if (cmd == "L2OFF") { digitalWrite(PIN_COMEDOR,LOW); Serial.println("COMEDOR:OFF");
+  }
+  else if (cmd == "L3" || cmd == "L3ON") { digitalWrite(PIN_COCINA,HIGH); Serial.println("COCINA:ON");
+  }
+  else if (cmd == "L3OFF") { digitalWrite(PIN_COCINA,LOW); Serial.println("COCINA:OFF");
+  }
+  else if (cmd == "L4" || cmd == "L4ON") { digitalWrite(PIN_BANO,HIGH); Serial.println("BANO:ON");
+  }
+  else if (cmd == "L4OFF") { digitalWrite(PIN_BANO,LOW); Serial.println("BANO:OFF");
+  }
+  else if (cmd == "L5" || cmd == "L5ON") { digitalWrite(PIN_HAB,HIGH); Serial.println("HAB:ON");
+  }
+  else if (cmd == "L5OFF") { digitalWrite(PIN_HAB,LOW); Serial.println("HAB:OFF"); }
+  else if (cmd == "ALLON") { allOn(); Serial.println("TODAS:ON");
+  }
+  else if (cmd == "ALLOFF") { allOff(); Serial.println("TODAS:OFF");
+  }
+
+  // Control de comandos de motor
+  else if (cmd == "FAN0") { setVentilador(0);
+  }
+  else if (cmd == "FAN1") { setVentilador(20); }
+  else if (cmd == "FAN2") { setVentilador(40);
+  }
+  else if (cmd == "FAN3") { setVentilador(60); }
+
+  // Control de la puerta
+  else if (cmd == "DOOR") { togglePuerta();
+  }
+  else if (cmd == "DOOROPEN") { moverPuerta(true); }
+  else if (cmd == "DOORCLOSE") { moverPuerta(false);
+  }
+
+  // Control de Escenas
+  else if (cmd == "FIESTA") { cargarEscenaPredefinida(1);
+  }
+  else if (cmd == "RELAX") { cargarEscenaPredefinida(2); }
+  else if (cmd == "NIGHT") { cargarEscenaPredefinida(3);
+  }
+
+  // Control de Cargo de Escenas
+  else if (cmd == "LOAD_SCENA") {
+    modoCarga = true;
+    totalPasos = 0;
+    Serial.println("* MODO CARGA ACTIVADO *");
+    Serial.println("Agrega tus lineas del .org, debe terminar con END_LOAD NOMBRE");
+  }
+  else if(modoCarga){
+    procesarLineaEscena(cmd);
+  }
+  else if(cmd.startsWith("END_LOAD")){
+    nombreNuevaEscena=cmd.substring(9);
+    Serial.println("nombreNuevaEscena:"+nombreNuevaEscena);
+    guardarEscenaEnEEPROM();
+  }
+  // Control del Sistema
+  else if(cmd == "STOP"){
+    escenaActiva = false;
+    nombreEscena = "Manual";
+    Serial.println("ESCENA DETENIDA");
+  }
+  else if(cmd == "STATUS"){ imprimirEstado(); }
+  else if(cmd == "RESET"){ resetSistema();
+  }
+  else if(cmd == "LIST_SCENES"){ listarEscenas(); }
+  else {Serial.println("--> Comando Desconocido 😢");}
+
+  actualizarLCD();
+  guardarEstadoActual();
 }
 
 void setVentilador (int pwm){
@@ -114,6 +209,16 @@ void allOff(){
   digitalWrite(PIN_BANO, LOW);
   digitalWrite(PIN_HAB, LOW);
 }
+
+//# Escena: FIESTA
+//# Descripcion: Luces parpadeando rapidamente en patron alternado
+//# Duracion total aproximada: 20 segundos
+//
+//SALA:ON:500:20  // pos1= SALA  pos2 =ON pos3= 500 pos3+1= 20
+//COMEDOR:OFF:500:20
+//COCINA:ON:300:30
+//BAÑO:OFF:300:30
+//HABITACION:ON:200:50
 
 void procesarLineaEscena(String linea){ 
   linea.trim();
