@@ -335,3 +335,15 @@ void cargarEscenaPredefinida(int id){
   escenaActiva = true;
   Serial.print("  - "); Serial.println(nombreEscena); 
 }
+
+
+HOLLLLLASD
+
+
+ASFPOKOFKSOAF
+SKSA
+FOKSA
+FOKASF
+OKAS
+fKA
+SFSAFAFASD
