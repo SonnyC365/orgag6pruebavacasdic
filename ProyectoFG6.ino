@@ -18,6 +18,7 @@ const int PIN_SERVO = 4;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 Servo puertaServo;
 
+// Variables Globales a Utilizar
 int velocidadFan = 0;
 bool puertaAbierta = false;
 String nombreEscena = "Manual";
@@ -85,6 +86,15 @@ void allOff(){
   digitalWrite(PIN_HAB, LOW);
 }
 
+byte getPinFromAmbiente(String amb){
+  if(amb == "SALA") return PIN_SALA;
+  if(amb == "COMEDOR") return PIN_COMEDOR;
+  if(amb == "COCINA") return PIN_COCINA;
+  if(amb == "BANO") return PIN_BANO;
+  if(amb == "HABITACION" || amb == "HAB") return PIN_HAB;
+  return 0;
+}
+
 void actualizarLCD(){
   lcd.clear();
   lcd.setCursor(0,0);
@@ -114,9 +124,24 @@ void imprimirEstado(){
   Serial.print("ESCENA : "); Serial.println(nombreEscena);
 }
 
+void resetSistema(){
+  allOff();
+  setVentilador(0);
+  moverPuerta(false);
+  escenaActiva = false;
+  nombreEscena = "Reset";
+  Serial.println("*** Sistema Reiniciado ***");
+}
+
 void listarEscenas(){
   Serial.println("*** Escenas Guardadas ***");
   for(int i = 0; i < numEscenas; i++){
     Serial.print(" >."); Serial.println(escenasGuardadas[i]);
   }
+}
+
+void cargarEscenaPredefinida(int id){
+  nombreEscena = (id == 1) ? "Fiesta" : (id==2) ? "Relax" : "Noche";
+  escenaActiva = true;
+  Serial.print("  - "); Serial.println(nombreEscena); 
 }
