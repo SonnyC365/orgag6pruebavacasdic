@@ -126,3 +126,156 @@ El sistema de casa domotizada se divide conceptualmente en los siguientes módul
    Proporciona retroalimentación visual del estado del sistema mediante una pantalla LCD con interfaz I2C.
 
 ---
+
+
+## Funcionamiento del Sistema
+
+El sistema funciona recibiendo comandos desde una computadora a través de comunicación serial. Estos comandos son interpretados por el Arduino, el cual ejecuta las acciones correspondientes sobre los dispositivos conectados.
+
+El estado del sistema se actualiza en tiempo real y se muestra en la pantalla LCD, permitiendo al usuario conocer qué dispositivos se encuentran activos. Adicionalmente, el sistema puede almacenar configuraciones en memoria EEPROM para restaurarlas automáticamente tras un reinicio.
+
+### Flujo General del Sistema
+
+1. El usuario envía un comando desde la computadora.
+2. Arduino recibe e interpreta el comando.
+3. Se ejecuta la acción correspondiente sobre los actuadores.
+4. El estado del sistema se actualiza.
+5. La información se muestra en la pantalla LCD.
+6. Las configuraciones relevantes se almacenan en EEPROM si es necesario.
+
+---
+
+## Diagrama del Circuito
+
+![Captura de pantalla 2025-12-29 223048](https://hackmd.io/_uploads/BJO9hCx4Wl.png)
+
+---
+
+## Montaje de Circuito y Maqueta
+
+![WhatsApp Image 2025-12-30 at 1.12.48 AM](https://hackmd.io/_uploads/rkNrtWZVbe.jpg)
+
+![WhatsApp Image 2025-12-30 at 1.13.35 AM](https://hackmd.io/_uploads/rkESYbbEZg.jpg)
+![WhatsApp Image 2025-12-30 at 1.12.49 AM (3)](https://hackmd.io/_uploads/S1dStZ-EWl.jpg)
+
+![WhatsApp Image 2025-12-30 at 1.12.49 AM (2)](https://hackmd.io/_uploads/SkuSF-WN-l.jpg)
+
+![WhatsApp Image 2025-12-30 at 1.12.49 AM (1)](https://hackmd.io/_uploads/SJFHYW-V-g.jpg)
+
+![WhatsApp Image 2025-12-30 at 1.12.49 AM](https://hackmd.io/_uploads/SkdSK-W4-g.jpg)
+
+## GUI en Processing
+
+![proc1](https://hackmd.io/_uploads/Bk2LRZ-V-e.png)
+![proc4](https://hackmd.io/_uploads/Syp8CWZ4Wl.png)
+![proc3](https://hackmd.io/_uploads/r1lP0-WNbg.png)
+![proc2](https://hackmd.io/_uploads/HyxD0-ZN-x.png)
+
+### Componentes Principales del Processing
+
+1. **ControlCasa.pde** - Archivo principal que maneja la interfaz y comunicación
+2. **Boton.pde** - Clase base para botones interactivos
+3. **BotonCarga.pde** - Botón especializado para cargar archivos
+4. **BotonMostrar.pde** - Botón para visualizar escenas guardadas
+5. **GestorArchivos.pde** - Procesador de archivos .org
+6. **Console.pde** - Consola de mensajes (implementación básica)
+
+## Funcionamiento de la Interfaz
+
+### Inicialización (`setup()`)
+
+1. **Configuración de ventana**: 980x540 píxeles
+2. **Carga de fuentes**: Arial normal y bold
+3. **Conexión serial**: 
+   - Intenta conectar al primer puerto disponible
+   - Velocidad: 9600 baudios
+   - Si falla, continúa en modo simulación
+4. **Creación de interfaz**: Genera todos los botones de control
+
+### Secciones de Control
+
+#### 1. Control de Iluminación
+- **5 zonas**: Sala, Comedor, Cocina, Baño, Habitación
+- **Comandos individuales**: L1ON, L1OFF, L2ON, L2OFF, etc.
+- **Comandos globales**: ALLON, ALLOFF
+- Cada zona tiene color distintivo para identificación visual
+
+#### 2. Ventilador
+- **4 velocidades**: Apagado (FAN0), Baja (FAN1), Media (FAN2), Alta (FAN3)
+- Intensidad visual según velocidad
+
+#### 3. Control de Puerta
+- **TOGGLE** (DOOR): Alterna estado
+- **ABRIR** (DOOROPEN): Abre puerta
+- **CERRAR** (DOORCLOSE): Cierra puerta
+
+#### 4. Escenas Predefinidas
+- **FIESTA**: Activa escena de fiesta
+- **RELAX**: Activa escena de relajación
+- **NOCHE** (NIGHT): Activa escena nocturna
+- **DETENER** (STOP): Detiene escena en ejecución
+
+#### 5. Comandos del Sistema
+- **ESTADO** (STATUS): Consulta estado del Arduino
+- **VERSION**: Solicita versión del firmware
+- **REINICIAR** (RESET): Reinicia sistema
+- **LISTAR ESCENAS** (LIST_SCENES): Lista escenas en EEPROM
+- **BORRAR ESCENAS** (ERASE_SCENES): Borra todas las escenas
+- **CARGAR ARCHIVO .ORG**: Abre selector de archivos
+- **MOSTRAR ESCENA**: Visualiza contenido de escena guardada
+
+
+## Proceso de Carga de Archivos .org
+
+### Flujo de Ejecución
+
+```
+Usuario hace clic → BotonCarga.alClick() → selectInput() 
+→ Usuario selecciona archivo → fileSelected() 
+→ GestorArchivos.procesarArchivo() → Envío a Arduino
+```
+
+### Pasos Detallados en `GestorArchivos.procesarArchivo()`
+
+#### 1. Validación
+```java
+if (!ruta.toLowerCase().endsWith(".org")) {
+    // Rechaza el archivo
+}
+```
+
+#### 2. Extracción del Nombre
+```java
+String nombreEscena = split(nombreArchivo, '.')[0].toUpperCase();
+// Ejemplo: "fiesta.org" → "FIESTA"
+```
+
+#### 3. Lectura del Archivo
+```java
+String[] lineas = loadStrings(archivo);
+```
+
+#### 4. Protocolo de Envío al Arduino
+
+**Paso 1 - Inicio de carga:**
+```
+Envía: LOAD_SCENE\n
+Espera: 300ms
+```
+
+**Paso 2 - Envío de comandos:**
+```
+Para cada línea válida:
+  - Ignora líneas vacías
+  - Ignora comentarios (líneas que empiezan con #)
+  - Agrega prefijo [M] a la línea
+  - Envía: [M]COMANDO\n
+  - Espera: 150ms (tiempo para escribir en EEPROM)
+```
+
+**Ejemplo de envío:**
+```
+[M]SALA:ON:500:20
+[M]COMEDOR:OFF:500:20
+[M]COCINA:ON:300:30
+```
