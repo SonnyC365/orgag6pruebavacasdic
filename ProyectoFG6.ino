@@ -19,12 +19,35 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 Servo puertaServo;
 
 // Variables Globales a Utilizar
+String comando = "";
 int velocidadFan = 0;
 bool puertaAbierta = false;
 String nombreEscena = "Manual";
 bool escenaActiva = false;
 
+// EEPROM - Estableceer direcciones de memoria
+const int DIR_FAN = 0;
+const int DIR_PUERTA = 1;
+const int DIR_ESCENA_ACTIVA = 2; 
+const int DIR_NUM_PASOS = 10;
+const int DIR_PASOS_BASE = 20;
+
+// Variables Para el Sistema de Escenas
+bool modoCarga = false;
+String nombreNuevaEscena = "";
+struct PasoEscena{
+  byte pin;
+  bool estado;
+  unsigned int duracion; // en milisegundos
+  byte repeticiones;
+};
+PasoEscena pasosEscena[50];
+
+// Arreglo Unidimensional o lo que llamamos normalmente vector 
+int totalPasos = 0;
 String escenasGuardadas[10];
+
+// Nombres de escenas
 int numEscenas = 0;
 
 void setup() {
@@ -43,6 +66,8 @@ void setup() {
   lcd.init();
   lcd.backlight();
 
+// Recuperacion del estado de la EEPROM
+  recuperarEstado();
   actualizarLCD();
 // Mensajes a mostrar
   Serial.println("*** CASA AUTOMATIZADA DIC 2025 ***");
@@ -50,6 +75,10 @@ void setup() {
 }
 
 void loop() {
+
+}
+
+void ejecutarEscenaNonBlocking(){
 
 }
 
@@ -86,6 +115,32 @@ void allOff(){
   digitalWrite(PIN_HAB, LOW);
 }
 
+void procesarLineaEscena(String linea){ 
+  linea.trim();
+// Estructurar posiciones de la linea
+  if (linea.startsWith("#") || linea.length() == 0) return;
+  int pos1 = linea.indexOf(':');
+  int pos2 = linea.indexOf(':', pos1 + 1);
+  int pos3 = linea.indexOf(':', pos2 + 1);
+// Obtener datos del Ambiente
+  if(pos1 > 0 && pos2 > pos1 && pos3 > pos2 && totalPasos < 50 ){
+    String amb = linea.substring(0, pos1);
+    String est = linea.substring(pos1 + 1, pos2);
+    int dur = linea.substring(pos2 + 1, pos3).toInt();
+    int rep = linea.substring(pos3 + 1).toInt();
+// Mapeo de Ambiente a pin
+    byte pin = getPinFromAmbiente(amb);
+    if(pin > 0){
+      pasosEscena[totalPasos].pin = pin;
+      pasosEscena[totalPasos].estado = (est == "ON");
+      pasosEscena[totalPasos].duracion = dur;
+      pasosEscena[totalPasos].repeticiones = rep;
+      totalPasos++;
+      Serial.print(" -> Linea Agregada");
+    }
+  }
+}
+
 byte getPinFromAmbiente(String amb){
   if(amb == "SALA") return PIN_SALA;
   if(amb == "COMEDOR") return PIN_COMEDOR;
@@ -93,6 +148,36 @@ byte getPinFromAmbiente(String amb){
   if(amb == "BANO") return PIN_BANO;
   if(amb == "HABITACION" || amb == "HAB") return PIN_HAB;
   return 0;
+}
+
+void guardarEscenaEnEEPROM(){
+  //Guardar el nombre de cada escena
+  escenasGuardadas[numEscenas] = nombreNuevaEscena;
+  numEscenas++;
+// Guardar pasos (4 bytes por paso)
+  EEPROM.update(DIR_NUM_PASOS, totalPasos);
+  for(int i = 0; i < totalPasos; i++){
+    int addr = DIR_PASOS_BASE + (i * 4);
+    EEPROM.update(addr, pasosEscena[i].pin);
+    EEPROM.update(addr + 1, pasosEscena[i].estado);
+    EEPROM.update(addr + 2, lowByte(pasosEscena[i].duracion));
+    EEPROM.update(addr + 3, highByte(pasosEscena[i].duracion));
+    EEPROM.update(addr + 4, pasosEscena[i].repeticiones);
+  }
+}
+
+void recuperarEstado(){
+  velocidadFan = EEPROM.read(DIR_FAN);
+  puertaAbierta = EEPROM.read(DIR_PUERTA);
+  int escenaId = EEPROM.read(DIR_ESCENA_ACTIVA);
+  setVentilador(velocidadFan);
+  moverPuerta(puertaAbierta);
+  Serial.println("Estado Recuperado desde la EEPROM");
+}
+
+void guardarEstadoActual(){
+  EEPROM.update(DIR_FAN, velocidadFan);
+  EEPROM.update(DIR_PUERTA, puertaAbierta);
 }
 
 void actualizarLCD(){
